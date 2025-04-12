@@ -1,0 +1,98 @@
+import React, { useState, useEffect, useRef } from "react"; import { Button } from "@/components/ui/button"; import { Card, CardContent } from "@/components/ui/card"; import * as Tone from "tone";
+
+const chords = [ { name: "C Major", notes: ["C4", "E4", "G4"] }, { name: "G Major", notes: ["G3", "B3", "D4"] }, { name: "D Major", notes: ["D4", "F#4", "A4"] }, ];
+
+const bgTracks = [ { title: "Paro - Aditya Rikhari", url: "https://example.com/paro.mp3" }, { title: "Until I Found You - Stephen Sanchez", url: "https://example.com/until-i-found-you.mp3" }, { title: "Perfect - Ed Sheeran", url: "https://example.com/perfect.mp3" }, { title: "A Thousand Years - Christina Perri", url: "https://example.com/a-thousand-years.mp3" }, { title: "Viral Insta Track", url: "https://example.com/viral-track.mp3" } ];
+
+export default function GuitarChordsGame() { const [currentChord, setCurrentChord] = useState(null); const [status, setStatus] = useState(""); const [statusColor, setStatusColor] = useState("text-black"); const [listening, setListening] = useState(false); const [bgMusic, setBgMusic] = useState(null); const [level, setLevel] = useState(1); const [score, setScore] = useState(0); const [badge, setBadge] = useState(null); const canvasRef = useRef(null); const analyserRef = useRef(null);
+
+const getRandomChord = () => { const chord = chords[Math.floor(Math.random() * chords.length)]; setCurrentChord(chord); setStatus(""); setStatusColor("text-black"); };
+
+const playChord = () => { const synth = new Tone.PolySynth().toDestination(); synth.triggerAttackRelease(currentChord.notes, "1n"); };
+
+const updateScore = (success) => { const newScore = success ? score + 1 : score; setScore(newScore); if (newScore >= level * 5) { setLevel(level + 1); setBadge(Level ${level + 1} Unlocked!); setTimeout(() => setBadge(null), 3000); } };
+
+const startListening = async () => { setListening(true); const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const audioContext = new AudioContext(); const source = audioContext.createMediaStreamSource(stream); const analyser = audioContext.createAnalyser(); analyser.fftSize = 256; analyserRef.current = analyser; source.connect(analyser); const data = new Uint8Array(analyser.frequencyBinCount);
+
+setTimeout(() => {
+  setListening(false);
+  const success = Math.random() > 0.4;
+  setStatus(success ? "Correct!" : "Try Again");
+  setStatusColor(success ? "text-green-500" : "text-red-500");
+  updateScore(success);
+}, 3000);
+
+};
+
+const drawVisualizer = () => { const canvas = canvasRef.current; const ctx = canvas.getContext("2d"); const analyser = analyserRef.current; if (!canvas || !ctx || !analyser) return;
+
+const data = new Uint8Array(analyser.frequencyBinCount);
+
+const draw = () => {
+  requestAnimationFrame(draw);
+  analyser.getByteFrequencyData(data);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const barWidth = (canvas.width / data.length) * 2.5;
+  let x = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    const barHeight = data[i];
+    ctx.fillStyle = `hsl(${(i * 10) % 360}, 100%, 50%)`;
+    ctx.fillRect(x, canvas.height - barHeight / 2, barWidth, barHeight / 2);
+    x += barWidth + 1;
+  }
+};
+
+draw();
+
+};
+
+const playBgMusic = (trackUrl) => { if (bgMusic) { bgMusic.pause(); } const audio = new Audio(trackUrl); audio.loop = true; audio.volume = 0.4; audio.play(); setBgMusic(audio); };
+
+useEffect(() => { getRandomChord(); playBgMusic(bgTracks[0].url); }, []);
+
+useEffect(() => { if (analyserRef.current) drawVisualizer(); }, [listening]);
+
+return ( <div className="flex flex-col items-center justify-center min-h-screen p-4"> <h1 className="text-3xl font-bold mb-4">Guitar Chord Trainer</h1> <p className="mb-2 text-lg">Level: {level} | Score: {score}</p> {badge && <p className="text-yellow-500 font-bold mb-2">{badge}</p>}
+
+{currentChord && (
+    <Card className="w-full max-w-md">
+      <CardContent className="p-4 text-center">
+        <h2 className="text-xl font-semibold mb-2">
+          Play this chord: <span className="text-blue-600">{currentChord.name}</span>
+        </h2>
+        <div className="flex justify-center gap-4">
+          <Button onClick={playChord}>Hear It</Button>
+          <Button onClick={startListening} disabled={listening}>
+            {listening ? "Listening..." : "Play Chord"}
+          </Button>
+          <Button onClick={getRandomChord}>Next</Button>
+        </div>
+        <p className={`mt-4 text-lg font-bold ${statusColor}`}>{status}</p>
+      </CardContent>
+    </Card>
+  )}
+
+  <div className="mt-6 text-center">
+    <h2 className="text-lg font-medium mb-2">Choose Background Music</h2>
+    <div className="grid grid-cols-2 gap-2">
+      {bgTracks.map((track, index) => (
+        <Button key={index} onClick={() => playBgMusic(track.url)}>
+          {track.title}
+        </Button>
+      ))}
+    </div>
+  </div>
+
+  <canvas
+    ref={canvasRef}
+    width={600}
+    height={200}
+    className="mt-8 rounded-xl shadow-lg border-2 border-gray-800"
+  ></canvas>
+</div>
+
+); }
+
